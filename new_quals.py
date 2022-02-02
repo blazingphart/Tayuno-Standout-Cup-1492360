@@ -59,7 +59,15 @@ def get_token(client_id, client_secret):
     return response.json().get('access_token')
 
 
+def calculate_acc(n300, n100, n50, nmiss):
+    n300 = int(n300)
+    n100 = int(n100)
+    n50 = int(n50)
+    nmiss = int(nmiss)
 
+    acc = (300*n300 + 100*n100 + 50*n50) / (300*(n300 + n100 + n50 + nmiss))
+    acc = round(acc, 4)*100.0
+    return acc
 
 
 def get_pool():
@@ -94,29 +102,33 @@ def process_mp(mp, pool):
         if i < 10:
             map_id = mp[i]['beatmap_id']
             if map_id in mappool_id:
-                for score_detail in mp[i]['scores']:
-                    player_id = score_detail['user_id']
-                    score = int(score_detail['score'])
+                for score in mp[i]['scores']:
+                    player_id = score['user_id']
                     try:
                         team_name = players[player_id]
                     except KeyError:
                         print("User id: {} does not exsit in teams.json".format(player_id))
                     else:
-                        first_run[team_name][map_id][player_id] = score
-                        first_run[team_name][map_id]["Team score"] += score
+                        first_run[team_name][map_id][player_id] = {"score": int(score["score"]), 
+                                        "acc": float('%.2f' % round(calculate_acc(score["count300"], score["count100"], score["count50"], score["countmiss"]), 2)),
+                                        "combo": int(score["maxcombo"])
+                                        }
+                        first_run[team_name][map_id]["Team score"] += int(score["score"])
         else:
             map_id = mp[i]['beatmap_id']
             if map_id in mappool_id:
                 for score_detail in mp[i]['scores']:
                     player_id = score_detail['user_id']
-                    score = int(score_detail['score'])
                     try:
                         team_name = players[player_id]
                     except KeyError:
                         print("User id: {} does not exsit in teams.json".format(player_id))
                     else:
-                        second_run[team_name][map_id][player_id] = score
-                        second_run[team_name][map_id]["Team score"] += score
+                        second_run[team_name][map_id][player_id] = {"score": int(score["score"]), 
+                                        "acc": float('%.2f' % round(calculate_acc(score["count300"], score["count100"], score["count50"], score["countmiss"]), 2)),
+                                        "combo": int(score["maxcombo"])
+                                        }
+                        second_run[team_name][map_id]["Team score"] += int(score["score"])
         
         with open("team_scores_first_run.json", "w") as f:
             json.dump(first_run, f, indent=4)
@@ -128,7 +140,11 @@ def process_mp(mp, pool):
 
 
 def download_data(pool, client_id, client_secret, key):
-    quals_lobby = listify()
+    quals_lobby = []
+
+    with open("quals_lobby.json", "r") as f:
+        quals_lobby = json.load(f)
+    f.close()
 
     for i in range(len(quals_lobby)):
         link = str(quals_lobby[i])
@@ -172,13 +188,19 @@ def final_team_score():
     for team_name in final_score:
         for map_id in final_score[team_name]:
             if first_run[team_name][map_id]["Team score"] > second_run[team_name][map_id]["Team score"]:
-                for label in final_score[team_name][map_id]:
-                    final_score[team_name][map_id][label] = first_run[team_name][map_id][label]
-                final_score[team_name][map_id]["Run"] = "First"
+                for label in first_run[team_name][map_id]:
+                    final_score[team_name][map_id][label] = first_run[team_name][map_id][label]   
             else:
-                for label in final_score[team_name][map_id]:
+                for label in second_run[team_name][map_id]:
                     final_score[team_name][map_id][label] = second_run[team_name][map_id][label]
+
+            diff = first_run[team_name][map_id]["Team score"] - second_run[team_name][map_id]["Team score"]
+
+            if diff > 0:
+                final_score[team_name][map_id]["Run"] = "First"
+            else: 
                 final_score[team_name][map_id]["Run"] = "Second"
+            final_score[team_name][map_id]["Difference"] = abs(diff)
 
     with open("final_team_score.json", "w") as f:
         json.dump(final_score, f, indent=4)
@@ -191,7 +213,7 @@ def main():
     client_id = "9136"
     client_secret = "6SQ6vIAo0odsjwQcZQhHD3yjrGEOTeIh9KKg2q2k"
     key = "661f08bb609b9562cfcc0b03ec09dd6065622114"
-    # download_data(pool, client_id, client_secret, key)
+    download_data(pool, client_id, client_secret, key)
     final_team_score()
 
 
