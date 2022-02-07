@@ -2,6 +2,7 @@ import datetime
 import time
 import json
 from typing import final
+from dotenv import load_dotenv
 import requests
 import pprint
 import os
@@ -117,8 +118,8 @@ def process_mp(mp, pool):
         else:
             map_id = mp[i]['beatmap_id']
             if map_id in mappool_id:
-                for score_detail in mp[i]['scores']:
-                    player_id = score_detail['user_id']
+                for score in mp[i]['scores']:
+                    player_id = score['user_id']
                     try:
                         team_name = players[player_id]
                     except KeyError:
@@ -210,9 +211,10 @@ def final_team_score():
 
 def main():
     pool = get_pool()
-    client_id = "9136"
-    client_secret = "6SQ6vIAo0odsjwQcZQhHD3yjrGEOTeIh9KKg2q2k"
-    key = "661f08bb609b9562cfcc0b03ec09dd6065622114"
+    load_dotenv()
+    client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("CLIENT_SECRET")
+    key = os.getenv("KEY")
     download_data(pool, client_id, client_secret, key)
     final_team_score()
 
